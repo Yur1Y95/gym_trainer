@@ -359,12 +359,25 @@ async function loadAll(){
   S.custom=(x.data||[]).filter(r=>MUSCLES.includes(r.primary_muscle)).map(r=>({id:r.id,name:r.name,primary:r.primary_muscle,secondary:[]}));
   S.status=S.recover?'recover':'ready';render(was!=='ready');
 }
+/* повторный вход — раз в 60 дней: сессия Supabase сама не истекает, срок считаем от даты входа */
+const LOGIN_KEY='gt-login-at',LOGIN_DAYS=60;
+function loginExpired(uid){
+  try{
+    const v=JSON.parse(localStorage.getItem(LOGIN_KEY)||'null');
+    if(v&&v.uid===uid)return Date.now()-v.t>LOGIN_DAYS*864e5;
+    localStorage.setItem(LOGIN_KEY,JSON.stringify({uid,t:Date.now()}));
+    if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{}); // просим браузер не чистить данные сайта
+  }catch(e){}
+  return false;
+}
 function boot(){
   if(!SUPABASE_URL||!SUPABASE_KEY||!window.supabase){S.status='config';render(true);return}
-  S.sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+  S.sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true}});
   S.sb.auth.onAuthStateChange((event,session)=>{setTimeout(()=>{
     if(event==='PASSWORD_RECOVERY')S.recover=true;
-    const uid=session&&session.user?session.user.id:null;
+    let uid=session&&session.user?session.user.id:null;
+    if(uid&&loginExpired(uid)){S.authMsg='Прошло 60 дней — войдите снова.';S.sb.auth.signOut({scope:'local'});return}
+    if(!uid&&event==='SIGNED_OUT')try{localStorage.removeItem(LOGIN_KEY)}catch(e){}
     if(uid===S.uid&&S.status!=='loading'){if(S.recover&&S.status==='ready'){S.status='recover';render(true)}return}
     S.uid=uid;S.email=uid?session.user.email||'':'';
     if(!uid){S.profile=null;S.workouts=[];S.inbody=[];S.custom=[];S.edit=null;S.status='auth';render(true)}
