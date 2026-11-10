@@ -119,6 +119,25 @@ input[type=range]{padding:0;min-height:32px;accent-color:var(--accent);backgroun
 .icon:disabled{opacity:.3;cursor:default}
 .calrow{border-top:1px solid var(--line);padding-top:10px}
 .stack{display:flex;flex-direction:column;gap:6px}
+.bmap{display:block;width:100%;height:auto}
+.mbody{fill:var(--sunken);stroke:var(--sunken);stroke-width:.6}
+.mus{fill:color-mix(in srgb,var(--muted) 24%,var(--sunken));stroke:var(--sunken);stroke-width:.7}
+.mus.p,.mus.hi{fill:var(--accent)}
+.mus.s,.mus.lo{fill:light-dark(#1c7ed6,#4dabf7)}
+.mus.ok{fill:var(--good)}
+.chip.sec{color:light-dark(#1c7ed6,#4dabf7);background:color-mix(in srgb,currentColor 15%,transparent)}
+.hrow{display:flex;gap:14px;align-items:center}
+.hrow .bmap{width:clamp(124px,34%,190px);flex:none}
+.hstats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.hstats .stat{padding:7px 8px}
+.hstats .stat b{font-size:14px;white-space:nowrap}
+.hstats .stat span{font-size:11px}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--accent);margin-right:5px;vertical-align:-1px}
+.legend i.s{background:light-dark(#1c7ed6,#4dabf7)}
+.legend i.ok{background:var(--good)}
+.amap{max-width:340px;margin:0 auto;width:100%}
+.hdetail{border-top:1px solid var(--line);padding-top:10px}
 @media (max-width:400px){.bar{grid-template-columns:88px 1fr 70px}}
 @media (prefers-reduced-motion:no-preference){.track .fill{transition:width .3s}}
 </style>
@@ -255,6 +274,38 @@ function zone(perWeek){return perWeek<=0?['none','нет нагрузки']:perW
 function fatigueWord(v){return v==null?'не указана':v<=3?'лёгкая':v<=6?'рабочая':v<=8?'тяжёлая':'на пределе'}
 /*END*/
 
+/* ---------- схема тела: вид спереди и сзади ---------- */
+const BODY='M50 4C44 4 41 9 41 15C41 20 43 24 46 26L46 30C40 32 33 32 29 35C24 37 21 43 21 50C20 58 18 66 17 74C15 84 13 94 12 104C10 108 9 114 11 119C13 121 16 119 17 114L18 106C21 96 23 86 25 77C27 68 28 60 29 54C30 64 32 76 35 88C33 96 31 104 31 112C30 126 31 142 34 156C32 166 32 178 35 192C36 198 37 202 36 206L33 212C33 215 40 215 43 213L43 206C44 196 45 182 44 170C44 164 45 160 46 156C47 142 49 126 50 114Z';
+const ARM='M22 52C21 58 19.5 65 19 72C21 74 24 74 25.5 72C27 66 28 59 28.5 54C26 52 24 51 22 52Z';
+const FORE='M18 77C16 86 14 95 13 103L17.5 104C20 96 22.5 87 24.5 78C22.5 76 20 76 18 77Z';
+const DELT='M30 35C25 36 21.5 42 21.5 50C24 52 27 50 29 46C31 42 32 38 30 35Z';
+const CALF='M34 162C32.5 172 33.5 184 37 195C39 196.5 40.5 196.5 42 195C45 184 45 172 43.5 162C40.5 160 37 160 34 162Z';
+const FRONT={
+ 'Дельты':[DELT],
+ 'Грудь':['M48.8 37L33 36.5C31 40 30 46 30.5 52C35 57 44 57 48.8 53Z'],
+ 'Бицепс':[ARM],'Предплечья':[FORE],
+ 'Пресс':['M41.5 59H48.8V65.5H41.5Z','M41.5 67.5H48.8V74H41.5Z','M41.5 76H48.8V82.5H41.5Z','M41.5 84.5H48.8V107C45 104 42.5 98 41.5 92Z'],
+ 'Квадрицепс':['M32 114C31 126 32 140 35 153C38 156 43 156 45.5 153C47 142 48.5 128 49 118C44 112 37 111 32 114Z'],
+ 'Икры':[CALF]};
+const BACK={
+ 'Верх спины':['M49.5 27L46.5 30.5C41 32.5 35 33 31.5 35C36 38 40 42 42 48L49.5 62Z'],
+ 'Дельты':[DELT],
+ 'Широчайшие':['M30.5 53C31 62 33 74 36 84C40 88 45 90 49.5 90L49.5 65L42 51C38 48 34 49 30.5 53Z'],
+ 'Поясница':['M49.5 92L38 88.5C36.5 94 36 100 36.5 105L49.5 107Z'],
+ 'Трицепс':[ARM],'Предплечья':[FORE],
+ 'Ягодицы':['M49.5 109L36 107C32.5 111 31.5 118 32.5 126C37 131 45 131 49.5 126Z'],
+ 'Бицепс бедра':['M33 131C32.5 140 33.5 148 35.5 154C38.5 156 43 156 45.5 154C47 146 48 138 48.5 132C44 135 37 135 33 131Z'],
+ 'Икры':[CALF]};
+// levels: {мышца: класс}; p — основная, s — вспомогательная; lo/ok/hi — объём за неделю
+function bodyMap(levels,label){
+  const fig=(set,dx)=>{
+    const half=`<path class="mbody" d="${BODY}"/>`+Object.keys(set).map(m=>{const v=levels[m]||'';
+      return set[m].map(d=>`<path class="mus ${v}" d="${d}"><title>${m}</title></path>`).join('')}).join('');
+    return `<g transform="translate(${dx},0)">${half}<g transform="translate(100,0) scale(-1,1)">${half}</g></g>`};
+  return `<svg class="bmap" viewBox="0 0 200 220" role="img" aria-label="${label}">${fig(FRONT,0)}${fig(BACK,100)}</svg>`;
+}
+function levelsOf(w){const l={};for(const it of w.items||[]){if(!doneSets(it).length)continue;l[it.primary]='p';for(const m of it.secondary||[])if(!l[m])l[m]='s'}return l}
+
 const $=s=>document.querySelector(s);
 const main=$('#main'),sheet=$('#sheet');
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -263,7 +314,7 @@ const today=()=>isoDay(new Date());
 
 const S={sb:null,uid:null,email:'',status:'loading',authMode:'signin',authMsg:'',authEmail:'',recover:false,profile:null,
   workouts:[],inbody:[],custom:[],edit:null,tab:'train',period:7,metric:'weight',pending:false,saving:0,saveErr:false,
-  pick:{q:'',group:''},armed:null,calM:null,calDay:null};
+  pick:{q:'',group:''},armed:null,calM:null,calDay:null,hist:{}};
 let saveTimer=null;
 const me=()=>S.profile;
 const allEx=()=>EX.concat(S.custom);
@@ -488,15 +539,21 @@ function viewTrain(){
 
 function viewHistory(){
   if(!S.workouts.length)return '<h1>История</h1><p class="muted">Тренировок пока нет. Первая появится здесь после вкладки «Тренировка».</p>';
-  return `<h1>История</h1>${S.workouts.map(w=>`<div class="card">
+  return `<h1>История</h1><div class="legend"><span><i></i>основная нагрузка</span><span><i class="s"></i>вспомогательная</span></div>${S.workouts.map(w=>{
+    const lv=levelsOf(w),ms=Object.keys(lv),prim=ms.filter(m=>lv[m]==='p'),sec=ms.filter(m=>lv[m]==='s');
+    const items=(w.items||[]).filter(it=>doneSets(it).length),cardio=(w.cardio||[]).filter(c=>c.min),open=!!S.hist[w.id];
+    const n=setCount(w),t=tonnage(w),c=cardioMin(w),cnt=items.length+cardio.length;
+    const stats=`<div class="hstats">${n?`<div class="stat"><b>${n}</b><span>${plural(n,'подход','подхода','подходов')}</span></div>`:''}${t?`<div class="stat"><b>${fmt(t/1000,1)} т</b><span>тоннаж</span></div>`:''}${c?`<div class="stat"><b>${fmt(c,0)} мин</b><span>кардио</span></div>`:''}</div>`;
+    const info=`<div class="grow stack"><div class="chips">${prim.map(m=>`<span class="chip main">${esc(m)}</span>`).join('')}${sec.map(m=>`<span class="chip sec">${esc(m)}</span>`).join('')}</div>${n||c?stats:'<span class="small muted">пока пусто</span>'}${w.fatigue?`<span class="small muted">усталость ${w.fatigue}/10 — ${fatigueWord(w.fatigue)}</span>`:''}</div>`;
+    return `<div class="card">
     <div class="row between"><div class="grow"><div class="title">${ruDate(w.date)}${w.done?'':' <span class="chip main">не завершена</span>'}</div><div class="small muted">${esc(w.gym||'')}</div></div>
       <button class="btn sm" type="button" data-act="open" data-id="${esc(w.id)}">Открыть</button></div>
-    <div class="chips">${musclesOf(w).map(m=>`<span class="chip">${esc(m)}</span>`).join('')}</div>
-    ${(w.items||[]).filter(it=>doneSets(it).length).map(it=>`<div class="small num"><b>${esc(it.name)}</b> <span class="muted">${doneSets(it).map(s=>fmt(s.w)+'×'+s.r).join(' · ')} ${it.unit==='lb'?'lb':'кг'}</span></div>`).join('')}
-    ${(w.cardio||[]).filter(c=>c.min).map(c=>`<div class="small num"><b>${esc(c.type)}</b> <span class="muted">${fmt(c.min,0)} мин${c.km?' · '+fmt(c.km,2)+' км':''}${c.hr?' · пульс '+c.hr:''}</span></div>`).join('')}
-    <div class="small muted">${esc(summaryLine(w))}</div>
-    ${w.note?`<div class="small">${esc(w.note)}</div>`:''}
-  </div>`).join('')}`;
+    ${ms.length?`<div class="hrow">${bodyMap(lv,'Проработанные мышцы: '+esc(ms.join(', ')))}${info}</div>`:info}
+    ${cnt||w.note?`<button class="btn sm ghost" type="button" data-act="hist-toggle" data-id="${esc(w.id)}" aria-expanded="${open}">${cnt?cnt+' '+plural(cnt,'упражнение','упражнения','упражнений'):'Заметка'} ${open?'▴':'▾'}</button>`:''}
+    ${open?`<div class="stack hdetail">${items.map(it=>`<div class="small num"><b>${esc(it.name)}</b> <span class="muted">${doneSets(it).map(s=>fmt(s.w)+'×'+s.r).join(' · ')} ${it.unit==='lb'?'lb':'кг'}</span></div>`).join('')}
+    ${cardio.map(c=>`<div class="small num"><b>${esc(c.type)}</b> <span class="muted">${fmt(c.min,0)} мин${c.km?' · '+fmt(c.km,2)+' км':''}${c.hr?' · пульс '+c.hr:''}</span></div>`).join('')}
+    ${w.note?`<div class="small">${esc(w.note)}</div>`:''}</div>`:''}
+  </div>`}).join('')}`;
 }
 
 const IB=[['weight','Вес','кг',1,0],['smm','Мышцы (SMM)','кг',1,1],['fat','Жир','кг',1,-1],['pbf','Жир','%',1,-1],['bmi','ИМТ','',1,0],['vfl','Висцеральный жир','ур.',0,-1],['bmr','Обмен','ккал',0,0],['tbw','Вода','л',1,0],['score','Оценка InBody','',0,1]];
@@ -568,6 +625,8 @@ function viewAnalysis(){
   </div>
   <h2>Нагрузка по мышцам, подходов в неделю</h2>
   <div class="card">
+    <div class="amap">${bodyMap(Object.fromEntries(MUSCLES.map(m=>{const v=load[m]/weeks;return [m,v<=0?'':v<10?'lo':v<=20?'ok':'hi']})),'Нагрузка по мышцам за период')}</div>
+    <div class="legend" style="justify-content:center"><span><i class="s"></i>мало, &lt;10</span><span><i class="ok"></i>в норме, 10–20</span><span><i></i>много, &gt;20</span><span>серое — нет нагрузки</span></div>
     ${MUSCLES.map(m=>{const v=load[m]/weeks,z=zone(v);return `<div class="bar"><span>${m}</span>
       <div class="track"><i class="zone" style="left:${(10/max*100).toFixed(1)}%;width:${(10/max*100).toFixed(1)}%"></i><i class="fill" style="width:${Math.min(100,v/max*100).toFixed(1)}%"></i></div>
       <span class="pill ${z[0]} num">${v?fmt(v,1)+' · ':''}${z[1]}</span></div>`}).join('')}
@@ -632,6 +691,7 @@ function act(btn){
     case 'signout':if(S.edit)saveEdit();S.authMsg='';S.sb.auth.signOut();break;
     case 'reload':S.status='loading';render(true);loadAll();break;
     case 'cal-day':S.calDay=id;render(true);break;
+    case 'hist-toggle':S.hist[id]=!S.hist[id];render(true);break;
     case 'cal-nav':{const c=S.calM||today().slice(0,7);S.calM=isoDay(new Date(+c.slice(0,4),+c.slice(5,7)-1+(+id),1)).slice(0,7);render(true);break}
     case 'start':{const d=id||($('#start-date')||{}).value||today();
       S.edit={id:newId(),date:d,gym:me().gym||'',started_at:new Date().toISOString(),done:false,items:[],cardio:[],fatigue:null,sleep_h:null,duration_min:null,note:''};saveEdit();render(true);break}
